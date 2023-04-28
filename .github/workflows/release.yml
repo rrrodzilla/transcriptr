@@ -1,0 +1,59 @@
+
+name: Release
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+          profile: minimal
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build for Windows
+        run: cross build --target x86_64-pc-windows-msvc --release
+        env:
+          RELEASE_FILENAME: my_project_windows.exe
+
+      - name: Upload Windows release asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: target/x86_64-pc-windows-msvc/release/my_project.exe
+          asset_name: ${{ env.RELEASE_FILENAME }}
+          asset_content_type: application/octet-stream
+
+      - name: Build for Mac
+        run: cross build --target x86_64-apple-darwin --release
+        env:
+          RELEASE_FILENAME: my_project_macos
+
+      - name: Upload Mac release asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: target/x86_64-apple-darwin/release/my_project
+          asset_name: ${{ env.RELEASE_FILENAME }}
+          asset_content_type: application/octet-stream
+
+      - name: Build for Linux
+        run: cross build --target x86_64-unknown-linux-gnu --release
+        env:
+          RELEASE_FILENAME: my_project_linux
+
+      - name: Upload Linux release asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: target/x86_64-unknown-linux-gnu/release/my_project
+          asset_name: ${{ env.RELEASE_FILENAME }}
+          asset_content_type: application/octet-stream
