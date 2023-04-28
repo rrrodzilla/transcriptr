@@ -1,7 +1,7 @@
 
 [package]
 name = "transcriptr"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 authors = ["Roland Rodriguez <rrrodzilla@protonmail.com>"]
 description = "A command-line app written in Rust that converts audio recordings with speaker identification information from AWS Transcribe into text, HTML, or JSON formats, formatted with time stamps and speaker labels."
