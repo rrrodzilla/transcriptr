@@ -10,8 +10,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Rust
-        uses: actions/setup-rust@v1
+      - name: rust-toolchain
+        uses: actions-rs/toolchain@v1.0.6
         with:
           rust-version: stable
           profile: minimal
