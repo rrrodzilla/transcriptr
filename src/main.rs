@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use time::Duration;
 
+// Define an enum for the output format, which can be Text, Html, or Json
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum OutputFormat {
     Text,
@@ -16,6 +17,7 @@ enum OutputFormat {
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init(); // Initialize the logger
 
+    // Define the command line arguments using clap
     let matches = command!()
         .arg(
             arg!(-i --input <FILE> "Sets the input file to transcribe")
@@ -30,10 +32,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .arg(
              arg!(-f --format <OutputFormat> "Sets the output format to text, html, or json")
                 .default_value("text")
-.value_parser(value_parser!(OutputFormat))
+                .value_parser(value_parser!(OutputFormat))
                 .required(false),
         )
-       .arg(
+        .arg(
              arg!(-s --speaker_format <FORMAT> "Sets the format for the speaker labels in the output")
                 .default_value("{}:")
                 .required(false),
@@ -45,49 +47,51 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
+    // Retrieve the command line arguments
     let speaker_format: &String = matches
         .get_one("speaker_format")
         .ok_or("Couldn't find speaker-format arg value")?;
     let line_break: &String = matches
         .get_one("line_break")
-        .ok_or("Couldn't find speaker-format arg value")?;
+        .ok_or("Couldn't find line-break arg value")?;
     let input_path: &String = matches
         .get_one("input")
         .ok_or("Please specify the input file.")?;
     let output_path: &String = matches
         .get_one("output")
-        .ok_or("Please provide an output path.")?; // Get the value of the output argument, which can be "-"
+        .ok_or("Please provide an output path.")?;
+
+    // Determine the output format
     let output_format = matches
         .get_one::<OutputFormat>("format")
         .ok_or("Please provide an output format.")?;
-    //let output_format = OutputFormat::from_str(output_format_str)?;
 
+    // Open the output file, which can be stdout if the output argument is "-"
     let output_file = if output_path == "-" {
-        // If the output argument is "-", use standard output
         Box::new(std::io::stdout()) as Box<dyn Write>
     } else {
-        // Otherwise, create the output file
         Box::new(
             File::create(output_path)
                 .map_err(|e| format!("Error creating the output file: {}.", e))?,
         )
     };
     let mut writer = BufWriter::new(output_file);
+
+    // Open the input file, which can be stdin if the input argument is "-"
     let input_reader: Box<dyn Read> = if input_path == "-" {
-        // If the input argument is "-", use standard input
         Box::new(std::io::stdin())
     } else {
-        // Otherwise, open the input file
         Box::new(
             std::fs::File::open(input_path)
                 .map_err(|e| format!("Error opening the input file: {}.", e))?,
         )
     };
-    let reader = BufReader::new(input_reader); // Create a buffered reader for the input file
-    let mut stream = Deserializer::from_reader(reader).into_iter::<Value>(); // Create a JSON deserializer for the input file
-
-    let mut speaker_start_times = HashMap::new(); // Create a HashMap to store speaker start times
-    let mut items = Vec::new(); // Create a vector to store transcription items
+    let reader = BufReader::new(input_reader);
+    let mut stream = Deserializer::from_reader(reader).into_iter::<Value>(); // Create a JSON deserializer for the
+                                                                             // Create a HashMap to store speaker start times
+    let mut speaker_start_times = HashMap::new();
+    // Create a vector to store transcription items
+    let mut items = Vec::new();
 
     // Loop over the JSON values in the input file
     while let Some(Ok(value)) = stream.next() {
@@ -121,11 +125,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let mut lines = Vec::new(); // Create a vector to store lines of transcription
-    let mut line = String::new(); // Create an empty string to store each line
-    let mut time = 0.0; // Initialize the time of each line
-    let mut speaker = "null".to_string(); // Initialize the speaker of each line as "null"
-    let mut current_speaker = speaker.clone(); // Initialize the current speaker as the same as the speaker of the previous line
+    // Create a vector to store lines of transcription
+    let mut lines = Vec::new();
+    // Create an empty string to store each line
+    let mut line = String::new();
+    // Initialize the time of each line
+    let mut time = 0.0;
+    // Initialize the speaker of each line as "null"
+    let mut speaker = "null".to_string();
+    // Initialize the current speaker as the same as the speaker of the previous line
+    let mut current_speaker = speaker.clone();
 
     // Loop over each transcription item and construct lines of transcription
     items
@@ -138,9 +147,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 current_speaker = speaker_start_times.get(start_time_str).unwrap().clone();
                 time = start_time_str.parse().unwrap_or(0.0);
             } else if item["type"] == "punctuation" {
-                // If the item is punctuation, add
-
-                // the punctuation to the current line
+                // If the item is punctuation, add the punctuation to the current line
                 line.push_str(content);
             }
 
@@ -165,10 +172,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Push the final line to the lines vector
     lines.push((time, speaker, line));
 
-    // Sort the lines by time
+    // Sort the lines
+
     lines.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    // Write the output based on the chosen format
     match output_format {
         OutputFormat::Text => {
+            // Loop over the lines and format them as text
             lines
                 .into_iter()
                 .try_for_each(|(time, speaker, line)| -> Result<(), Box<dyn Error>> {
@@ -178,7 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     let formatted_line = format!(
                         "[{:02}:{:02}:{:02}] {} {}{}",
-                        duration.whole_hours(), // Add a log event to show the program completed successfully
+                        duration.whole_hours(),
                         duration.whole_minutes() % 60,
                         duration.whole_seconds() % 60,
                         speaker_str,
@@ -191,10 +202,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .map_err(|e| format!("Error writing lines to the output file: {:?}.", e))?;
         }
         OutputFormat::Html => {
+            // Write the HTML boilerplate
             writeln!(
             &mut writer,
             "<!DOCTYPE html>\n<html>\n<head>\n<title>Transcription</title>\n<style>\n.speaker {{ font-weight: bold; }}\n</style>\n</head>\n<body>"
         )?;
+
+            // Loop over the lines and format them as HTML
             lines
                 .into_iter()
                 .try_for_each(|(time, speaker, line)| -> Result<(), Box<dyn Error>> {
@@ -202,7 +216,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let speaker_str = speaker_format.replace("{}", &speaker);
                     let formatted_line = format!(
                         "[{:02}:{:02}:{:02}] <span class=\"speaker\">{}</span>: {}<br>",
-                        duration.whole_hours(), // Add a log event to show the program completed successfully
+                        duration.whole_hours(),
                         duration.whole_minutes() % 60,
                         duration.whole_seconds() % 60,
                         speaker_str,
@@ -212,22 +226,30 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Ok(())
                 })
                 .map_err(|e| format!("Error writing lines to the output file: {:?}.", e))?;
+
+            // Write the closing HTML tags
             writeln!(&mut writer, "</body>\n</html>")?;
         }
         OutputFormat::Json => {
+            // Construct a JSON object with the transcription data
             let output_data = serde_json::json!({
-            "transcription": lines.iter().map(|(time, speaker, line)| {
-            let duration = Duration::seconds((time as &f64).round() as i64);
-            serde_json::json!({
-            "time": format!("{:02}:{:02}:{:02}", duration.whole_hours(), duration.whole_minutes() % 60, duration.whole_seconds() % 60),
-            "speaker": speaker,
-            "line": line,
-            })
-            }).collect::<Vec<_>>(),
+                "transcription": lines.iter().map(|(time, speaker, line)| {
+                    let duration = Duration::seconds((time as &f64).round() as i64);
+                    serde_json::json!({
+                        "time": format!("{:02}:{:02}:{:02}", duration.whole_hours(), duration.whole_minutes() % 60, duration.whole_seconds() % 60),
+                        "speaker": speaker,
+                        "line": line,
+                    })
+                }).collect::<Vec<_>>(),
             });
+
+            // Write the JSON object to the output file
             serde_json::to_writer_pretty(&mut writer, &output_data)?;
         }
     }
+
+    // Add a log event to show the program completed successfully
     log::info!("Program completed successfully.");
+
     Ok(())
 }
