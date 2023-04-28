@@ -1,0 +1,17 @@
+
+[package]
+name = "transcriptr"
+version = "0.1.0"
+edition = "2021"
+authors = ["Roland Rodriguez <rrrodzilla@protonmail.com>"]
+description = "A command-line app written in Rust that converts audio recordings with speaker identification information from AWS Transcribe into text, HTML, or JSON formats, formatted with time stamps and speaker labels."
+license = "MIT"
+
+[dependencies]
+serde_json = "1.0.96"
+serde = { version = "1.0.160", features = ["derive"] }
+clap = { version = "4.2.5", features = ["cargo", "derive"] }
+time = { version = "0.3.2", features = ["formatting","macros", "parsing"] }
+log = "0.4.17"
+env_logger = "0.10.0"
+
