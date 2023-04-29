@@ -19,10 +19,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Define the command line arguments using clap
     let matches = command!()
+        .arg_required_else_help(true)
         .arg(
             arg!(-i --input <FILE> "Sets the input file to transcribe")
-                .default_value("-")
-                .required(false)
+                .required(true)
         )
         .arg(
              arg!(-o --output <FILE> "Sets the output file to write the transcription to")
@@ -75,6 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .map_err(|e| format!("Error creating the output file: {}.", e))?,
         )
     };
+
     let mut writer = BufWriter::new(output_file);
 
     // Open the input file, which can be stdin if the input argument is "-"
@@ -87,14 +88,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
     };
     let reader = BufReader::new(input_reader);
-    let mut stream = Deserializer::from_reader(reader).into_iter::<Value>(); // Create a JSON deserializer for the
-                                                                             // Create a HashMap to store speaker start times
+    let stream = Deserializer::from_reader(reader).into_iter::<Value>(); // Create a JSON deserializer for the
+                                                                         // Create a HashMap to store speaker start times
     let mut speaker_start_times = HashMap::new();
     // Create a vector to store transcription items
     let mut items = Vec::new();
 
     // Loop over the JSON values in the input file
-    while let Some(Ok(value)) = stream.next() {
+    for value in stream {
+        if let Err(error) = value {
+            match error.classify() {
+                serde_json::error::Category::Syntax => {
+                    eprintln!("An error was caused by data that was not syntactically valid JSON. Line {}: column {}", error.line(), error.column())
+                }
+                serde_json::error::Category::Io => eprintln!(
+                    "An error was caused by failure to read or write bytes to an IO stream."
+                ),
+                serde_json::error::Category::Eof => eprintln!(
+                    "An error was caused by prematurely reaching the end of the input data."
+                ),
+                serde_json::error::Category::Data => {
+                    eprintln!("An error was caused by input data that was semantically incorrect.")
+                }
+            }
+            std::process::exit(1);
+        }
+        let value = value?;
         // Check if the value contains speaker labels
         if let Some(labels) = value
             .pointer("/results/speaker_labels/segments")
